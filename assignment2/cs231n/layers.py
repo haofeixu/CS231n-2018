@@ -850,26 +850,26 @@ def spatial_groupnorm_forward(x, gamma, beta, G, gn_param):
     ###########################################################################
     
     N, C, H, W = x.shape
-    x = np.reshape(x, (N*G, C//G*H*W))
-    
-    # Transpose x to use batchnorm code
-    x = x.T
 
-    # Just copy from batch normalization cdoe
-    mu = np.mean(x, axis=0)
+    # Page 4 of https://arxiv.org/pdf/1803.08494.pdf
+    x = x.reshape(N, G, C//G, H, W)
     
+    # Same procedures as batch norm
+    mu = np.mean(x, axis=(2, 3, 4), keepdims=True)
     xmu = x - mu
-    sq = xmu ** 2
-    var = np.var(x, axis=0)
 
+    var = np.var(x, axis=(2, 3, 4), keepdims=True)
     sqrtvar = np.sqrt(var + eps)
     ivar = 1./sqrtvar
-    xhat = xmu * ivar
-    
-    # Transform xhat and reshape
-    xhat = np.reshape(xhat.T, (N, C, H, W))
-    out = gamma[np.newaxis, :, np.newaxis, np.newaxis] * xhat + beta[np.newaxis, :, np.newaxis, np.newaxis]
 
+    xhat = xmu * ivar
+
+    # Reshape back to original input shape
+    xhat = np.reshape(xhat, (N, C, H, W))
+    
+    gammax = gamma * xhat
+	
+    out = gammax + beta
     cache = (xhat, gamma, xmu, ivar, sqrtvar, var, eps, G)
 
     ###########################################################################
